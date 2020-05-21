@@ -1,88 +1,69 @@
+% Batch mode is run to test on different maxDrift, sampleName, and noise at 
+% the same time. 
+% To test on various maxDrift values, define the set "maxDriftAll" whose
+% maximum is maxMaxDriftAll
 
-%% 2018.08.17_change script to function and remove global variables. Due to a few reasons
-% need to take care of the forward model matrix L with function of driftAll in scan anyway.
-% not easy to debug or change parameters: e.g. change N in do_setup_XH script will raise error, may need to change multiple files
-% 2nd run of programs after change parameters may have error (due to global variable).  clear all won't help and need to restart matlab.
-% 2018.11.30 added new test examples
-% 2018.12.03 correct a very annoying bug effect about sparse matrix.
-%     Matlab doesn't support 3D sparse matrix, use LAll(:,:,1) = L will make LAll a full matrix (without any message), 
-%     even though L is a sparse matrix! Use LAll
+%% Generate Model: 
 
-%% I: Generate Model: 
-% (0) in batchmode, such as generate multiple running for different maxDrift, sampleName, and noise for a paper  
-if ~exist('batchMode', 'var') || isempty(batchMode); batchMode = false; end
-
-% various pixel drift, various sample noise (maybe varies angle number)
-% Angle: 20, 40, 90, 180.  
-% (1) Generate Object
-% sampleName: the type and name to specify a sample object, not case-sensitive
-% Ny*Nx:    Sample object size
-% WGT:      Sample object ground truth
-
-if ~batchMode
-    sampleName = 'Brain'; % choose from {'Phantom', 'Brain', ''Golosio', 'circle', 'checkboard', 'fakeRod'}; not case-sensitive
+if ~exist('batchMode', 'var') || isempty(batchMode)
+    batchMode = false; 
 end
-Nx = 100; Ny = Nx; WSz = [Ny, Nx]; %  XH: Ny = 100 -> 10 or 50 for debug.  currently assume object shape is square not general rectangle
-WGT = createObject(sampleName, WSz); WGT = WGT/max(WGT(:)); assert(all(WGT(:)>=0), 'Groundtruth object should be nonnegative');% Object without noise. always assume WGT0 is normailzed with maximum 1.
 
-% (2) Scan Object: Create Forward Model and Sinograms
-% NTheta*NTau:  Sinogram Size
-% NScan:        Number of Scans, for example, NScan = 2, the first scan no drift, the 2nd scan has drift
-% driftGTAll:  Drift amount for all scans of NScan*1 cell, driftGTAll{n} for nth scan
-% LAll:         Forward Model for all scans of NScan*1 cell, LAll{n} for the nth scan
-% SAll:         Sinogram for all scans of NTheta*NTau*NScan, SAll(:,:,n) for the nth scan
+if ~batchMode 
+    sampleName = 'Brain';
+    maxDrift = 1; % maximum drift error relative to constant scan step size
+    maxMaxDriftAll = maxDrift;
+    noiseLevel = 0;
+end
 
-if ~batchMode
-    maxDrift = 1; % maximum drift error; choose from [0.5, 1, 2, 4, 8] or [0.5, 1, 2, 3, 5] etc.
-    maxMaxDriftAll = maxDrift; % in batch mode we consider different maxDrift from maxDriftAll set, where the maximum is maxMaxDriftAll
-end
-NTheta = 45;  % 30/60/45/90 sample angle #. Use odd NOT even, for display purpose of sinagram of Phantom. As even NTheta will include theta of 90 degree where sinagram will be very bright as Phantom sample has verical bright line on left and right boundary.
-NTau = ceil(sqrt(sum(WSz.^2))) + ceil(maxMaxDriftAll)*2; NTau = NTau + rem(NTau-Ny,2); % number of discrete beam, enough to cover object diagonal, plus tolarence with maxDrift, also use + rem(NTau-Ny,2) to make NTau the same odd/even as Ny just for perfection, so that for theta=0, we have sum(WGT, 2)' and  S(1, (1:Ny)+(NTau-Ny)/2) are the same with a scale factor
-SSz = [NTheta, NTau];
-driftGTAll = {0, []}; % Two Scans: 1st one no drift error. 
-rng('default'); % same random number for initial test
-driftGTAll{2} = (2*rand(NTau, 1)- 1) * maxDrift; % [-3, 3];  2nd scan:  drift error in pixel units, each line has drift error defined in in driftGTAll
-driftGTAll{2} (1:ceil(maxMaxDriftAll)) = 0;  driftGTAll{2} (end-ceil(maxMaxDriftAll)+1:end) = 0; % remember NTau = diagonal + ceil(maxMaxDrift)*2 with zero padding of ceil(maxDrift)
-NScan = numel(driftGTAll);
-LAll = cell(2,1); 
-SAll = zeros(NTheta, NTau, NScan);
-if ~batchMode
-    gaussianSTD = 0; % [0, 0.05]
-end
-for idxScan = 1: NScan
-        L = XTM_Tensor_XH(WSz, NTheta, NTau, driftGTAll{idxScan}, WGT);
-        if idxScan == 1
-            LNormalizer = full(max(sum(L,2))); % Compute the normalizer 0.0278 for WSz=100*100, NTheta,NTau=45*152 for 1st scan of no drift so that maximum row sum is 1 rather than a too small number
-        end
-        L = L/LNormalizer;
-        LAll{idxScan} = L; % Matlab may only support 2D sparse matrix, must use cell not 3D array like LAll(:,:,idxScan) = L
-        S = reshape(LAll{idxScan}*WGT(:), NTheta, NTau);
-        % add noise to sinogram
-        SMax = max(S(:));        
-        rng('default'); % same random number for initial test
-        SAll(:,:,idxScan) = imnoise(S/SMax, 'gaussian', 0, gaussianSTD^2)*SMax; % add noise to [0, 1 ] grayscale image, imnoise add gaussian noise but also seems to still threshold the noisy image to [0, 1]                 
-end
-%L = LAll{1}; Lnormalizer = full(max(sum(L,2))); L= L/Lnormalizer;% SAll:       
+% specify size of test image
+Nx = 100; Ny = Nx; WSz = [Ny,Nx];
+
+% define size of sinogram
+NTheta = 45; 
+NTau = ceil(sqrt(sum(WSz.^2))) + ceil(maxMaxDriftAll)*2; 
+NTau = NTau + rem(NTau-Ny,2);
+
+% generate test image, forward operator and sinogram WITHOUT drift error
+driftGT0 = 0; 
+[S0,L0,WGT,Lnormalizer] = generateModel(sampleName,[],WSz,NTheta,NTau,driftGT0,noiseLevel,0);
+
+% using the same test image WGT, generate forward operator and 
+% sinogram WITH drift error
+rng('default');
+driftGT1 = (2*rand(NTau, 1)- 1) * maxDrift;
+driftGT1(1:ceil(maxMaxDriftAll)) = 0; 
+driftGT1(end-ceil(maxMaxDriftAll)+1:end) = 0;
+[S1,L1] = generateModel('',WGT,WSz,NTheta,NTau,driftGT1,noiseLevel,LNormalizer);
+
+
+LAll = cell(2,1); SAll = LAll;
+LAll{1} = L0; LAll{2} = L1;
+SAll{1} = S0; SAll{2} = S1;
 
 %% Show W and S
 figNo = 10;
-figure(figNo+1); imagesc(WGT); axis image; title('Object Ground Truth');
-figure(figNo+2); imagesc(SAll(:,:,1)); axis image; title('Sinogram No drift');
-figure(figNo+3); imagesc(SAll(:,:,2)); axis image; title(sprintf('Sinogram With drift, PSNR=%.2fdB', difference(SAll(:,:,2), SAll(:,:,1))));
+figure(figNo+1); imagesc(WGT); axis image; axis off; 
+title('Object Ground Truth');
+
+figure(figNo+2); imagesc(SAll{1}); axis image; axis off; 
+title('Sinogram Without drift');
+
+figure(figNo+3); imagesc(SAll{2}); axis image; axis off; 
+title(sprintf('Sinogram With drift, PSNR=%.2fdB', difference(SAll{2}, SAll{1})));
 tilefigs;
 
-%% How good is calclating drift given the true sinogram pairs
+%% How good is calclating drift given the true sinogram pairs ??
 
-driftGT = driftGTAll{2};
 interpMethods = {'linear', 'quadratic'}; 
-driftComputed = calcDrift(SAll(:,:,2), SAll(:,:,1), maxDrift, interpMethods{1});
+driftComputed = calcDrift(SAll{2}, SAll{1}, maxDrift, interpMethods{1});
 % zero out the ground truth for the begin and end empty beams. 
 iStart = find(cumsum(driftComputed), 1, 'first');
 iEnd = NTau + 1 - find(cumsum(driftComputed(end:-1:1)), 1, 'first');
 idxHasDrift = iStart:iEnd;
 idxNoDrift = [1:iStart-1, iEnd+1:NTau];
 
-driftGT2 = driftGT;         driftGT2(idxNoDrift) = 0;
+driftGT2 = driftGT1;         driftGT2(idxNoDrift) = 0;
 figure(1001), clf; plot([driftGT2, driftComputed], '-x'); title(sprintf('psnr=%.2fdB', difference(driftComputed, driftGT2))); legend('GT', 'rec-testInterp'); grid on; grid minor; %driftComputed-driftGT2, 'dif'
 
 
@@ -94,7 +75,7 @@ figure(1001), clf; plot([driftGT2, driftComputed], '-x'); title(sprintf('psnr=%.
 
 %% II: Solve linear inverse problem: L*W = S
 % solve for three cases. 
-cases = {'with no drift', 'with known drift', 'with unknown drift, used forward model of no drift'};
+cases = {'with no drift', 'with known drift', 'with unknown drift'};
 idxS = [1, 2, 2]; % corresponding S matrix for three cases
 idxL = [1, 2, 1]; % corresponding L matrix for three cases, note in the last case, the drift is unkown, we use model of zero drift
 
@@ -129,7 +110,7 @@ paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 
 WUncalib = zeros(WSz(1), WSz(2), numel(cases), 'like', WGT);
 
 for n = 1:numel(cases)
-    WUncalib(:,:,n) = solveTwist(SAll(:,:,idxS(n)), LAll{idxL(n)}, paraTwist{:});
+    WUncalib(:,:,n) = solveTwist(SAll{idxS(n)}, LAll{idxL(n)}, paraTwist{:});
 end
 figNo = 50;
 for n = 1:numel(cases)    
@@ -147,7 +128,7 @@ regWtBestUncalib = zeros(numel(cases), 1);
 for n = 1:numel(cases)
     for nWt = 1:NWt        
         paraTwistTry = {'xSz', WSz, 'regFun', regType, 'regWt', regWtAllUncalib(nWt), 'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, 'maxSVDofA', maxSVDofA, 'tolA', 1e-8};
-        WUncalibAllWt(:,:,n,nWt) = solveTwist(SAll(:,:,idxS(n)), LAll{idxL(n)}, paraTwistTry{:});
+        WUncalibAllWt(:,:,n,nWt) = solveTwist(SAll{idxS(n)}, LAll{idxL(n)}, paraTwistTry{:});
         psnrAllWtUncalib(n, nWt) = psnr(WUncalibAllWt(:,:,n,nWt), WGT, 1);  % WGT is normalized with maximum as 1
     end
     [~, idx] = max(psnrAllWtUncalib(n,:));
@@ -222,7 +203,7 @@ L =  PGT*LAll{1};
 %difference(L, LAll{2})  % psnr/psnrSparse = 30.16dB/9.63dB
 difference(L*WGT(:), LAll{2}*WGT(:)) % psnr/psnrSparse = 34.82dB/32.31dB for phantom, but 45.34dB/44.80dB for brain which is more smooth
 figNo = 70;
-figure(figNo+1); W2 = solveTwist(SAll(:,:,2), L, paraTwist{:});figure(figNo+4); W = W2;  imagesc(W); axis image; title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', difference(W, WGT), regType, regWt, maxIterA));
-figure(figNo+2); W2 = solveWendy(SAll(:,:,2), L, WGT); figure(figNo+5); W = W2;  imagesc(W); axis image; title(sprintf('Rec Wendy %s, PSNR=%.2fdB', 'Use Interpolated Forward Model', difference(W, WGT)));
+figure(figNo+1); W2 = solveTwist(SAll{2}, L, paraTwist{:});figure(figNo+4); W = W2;  imagesc(W); axis image; title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', difference(W, WGT), regType, regWt, maxIterA));
+figure(figNo+2); W2 = solveWendy(SAll{2}, L, WGT); figure(figNo+5); W = W2;  imagesc(W); axis image; title(sprintf('Rec Wendy %s, PSNR=%.2fdB', 'Use Interpolated Forward Model', difference(W, WGT)));
 
 end

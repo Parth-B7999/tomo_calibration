@@ -4,6 +4,7 @@
 % maximum is maxMaxDriftAll
 
 %% Generate Model: 
+clear
 
 if ~exist('batchMode', 'var') || isempty(batchMode)
     batchMode = false; 
@@ -11,9 +12,9 @@ end
 
 if ~batchMode 
     sampleName = 'Brain';
-    maxDrift = 1; % maximum drift error relative to constant scan step size
+    maxDrift = 5; % maximum drift error relative to constant scan step size
     maxMaxDriftAll = maxDrift;
-    noiseLevel = 0.01;
+    noiseLevel = 0.02;
 end
 
 % specify size of test image
@@ -37,7 +38,7 @@ driftGT1(1:ceil(maxMaxDriftAll)) = 0;
 driftGT1(end-ceil(maxMaxDriftAll)+1:end) = 0;
 [S1,L1] = genModel('',WGT,WSz,NTheta,NTau,driftGT1,noiseLevel,LNormalizer);
 
-%%
+
 x0 = zeros(Nx*Ny,1);
 optnnr.eta = 1.01;
 optnnr.nl = noiseLevel;
@@ -51,20 +52,27 @@ optnnr.nl = noiseLevel;
 optnnr.svdbasis = 'v';
 optnnr.thr = 1e-3;
 optnnr.gamma = 10^-10;
-[X_fnnrv, Enrm_fnnrv] = flsqr_nnr(L0, S0(:), x0, WGT(:), optnnr);
+[X_fnnrv, Enrm_fnnrv] = flsqr_nnr(L0, S1(:), x0, WGT(:), optnnr);
 
-for i = 1:size(X_fnnrv,2)
-    psnr_fnnrv(i) = psnr(reshape(X_fnnrv(:,i),Ny,Nx),WGT);
-end
+% for i = 1:size(X_fnnrv,2)
+%     psnr_fnnrv(i) = psnr(reshape(X_fnnrv(:,i),Ny,Nx),WGT);
+% end
+% [~,indPsnr] = max(psnr_fnnrv)
+[~,ind] = min(Enrm_fnnrv)
 
-[~,indPsnr] = max(psnr_fnnrv)
-[~,indEnrm] = min(Enrm_fnnrv)
-
-Wfnnrv = X_fnnrv(:,indPsnr);
+Wfnnrv = X_fnnrv(:,ind);
 Wfnnrv(Wfnnrv <0) = 0;
 Wfnnrv = reshape(Wfnnrv,Ny,Nx);
 figure,imagesc(Wfnnrv), axis image, axis off
-title(sprintf('FLSQR-NNR(v), PSNR=%.2fdB, Iter %d', psnr(Wfnnrv,WGT), indPsnr));
+title(sprintf('FLSQR-NNR(v), PSNR=%.2fdB, Iter %d', psnr(Wfnnrv,WGT), ind));
+
+
+
+%% block coordinate descent
+optnnr.reg = 'discrep';
+[Whis_fnnrv,Shis_fnnrv,info_fnnrv] = recTomoDrift_Chang(WGT,L0,S1,20,...
+                            'FLSQR-NNR',maxDrift,LNormalizer,driftGT1,optnnr);
+
 
 
 %% FLSQR-NNR
@@ -79,18 +87,18 @@ optnnr.gamma = 10^-10;
 x0 = zeros(Nx*Ny,1);
 [X_fnnr, Enrm_fnnr] = flsqr_nnr(L0, S0(:), x0, WGT(:), optnnr);
 
-for i = 1:size(X_fnnr,2)
-    psnr_fnnr(i) = psnr(reshape(X_fnnr(:,i),Ny,Nx),WGT);
-end
+% for i = 1:size(X_fnnr,2)
+%     psnr_fnnr(i) = psnr(reshape(X_fnnr(:,i),Ny,Nx),WGT);
+% end
+% [~,indPsnr] = max(psnr_fnnr)
 
-[~,indPsnr] = max(psnr_fnnr)
-[~,indEnrm] = min(Enrm_fnnr)
+[~,ind] = min(Enrm_fnnr)
 
-Wfnnr = X_fnnr(:,indPsnr);
+Wfnnr = X_fnnr(:,ind);
 Wfnnr(Wfnnr <0) = 0;
 Wfnnr = reshape(Wfnnr,Ny,Nx);
 figure,imagesc(Wfnnr), axis image, axis off
-title(sprintf('FLSQR-NNR, PSNR=%.2fdB, Iter %d', psnr(Wfnnr,WGT), indPsnr));
+title(sprintf('FLSQR-NNR, PSNR=%.2fdB, Iter %d', psnr(Wfnnr,WGT), ind));
 
 %% IRN-LSQR-NNR
 optnnr.p = 2;
@@ -102,17 +110,16 @@ optnnr.reg = 0;
 optnnr.weigthtype = 'sqrt'; 
 optnnr.thrstop = 1e-8;
 
-[X_irn_tot, X_irn_finals, X_irn_best, Enrm_irn] = irn_lsqr_nnr(L0, S0(:), WGT(:), x0, optnnr);
+[X_irn_tot, ~,~, Enrm_irn] = irn_lsqr_nnr(L0, S0(:), WGT(:), x0, optnnr);
 
-for i = 1:size(X_irn_tot,2)
-    psnr_irn(i) = psnr(reshape(X_irn_tot(:,i),Ny,Nx),WGT);
-end
+% for i = 1:size(X_irn_tot,2)
+%     psnr_irn(i) = psnr(reshape(X_irn_tot(:,i),Ny,Nx),WGT);
+% end
+% [~,indPsnr] = max(psnr_irn)
+[~,ind] = min(Enrm_irn)
 
-[~,indPsnr] = max(psnr_irn)
-[~,indEnrm] = min(Enrm_irn)
-
-Wirn = X_irn_tot(:,indPsnr);
+Wirn = X_irn_tot(:,ind);
 Wirn(Wirn <0) = 0;
 Wirn = reshape(Wirn,Ny,Nx);
 figure,imagesc(Wirn), axis image, axis off
-title(sprintf('IRN-LSQR-NNR, PSNR=%.2fdB, Iter %d', psnr(Wirn,WGT), indPsnr));
+title(sprintf('IRN-LSQR-NNR, PSNR=%.2fdB, Iter %d', psnr(Wirn,WGT), ind));

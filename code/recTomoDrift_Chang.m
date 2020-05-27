@@ -1,16 +1,11 @@
-function [W_history,S_history,info] = recTomoDrift_TwIST(WGT,L0,S,maxIter,...
-                            maxDrift,LNormalizer,driftGT,params)
+function [W_history,S_history,info] = recTomoDrift_Chang(WGT,L0,S,maxIter,...
+                            solver,maxDrift,LNormalizer,driftGT,params)
                         
 % convert the script recTomographyWithDrift.m to a function
 
 if ~exist('maxDrift', 'var') || isempty(maxDrift)
     maxDrift = 1; 
 end
-
-regType = params{4};
-regWt = params{6};
-maxIterA = params{10};
-
 
 
 [Ny,Nx] = size(WGT);
@@ -21,8 +16,8 @@ WSz = size(WGT);
 driftAll = zeros(NTau, maxIter); 
 L = L0; 
 
-WPrev = zeros(Ny, Nx);
-paraTwist2 = params;
+WPrev = zeros(Ny*Nx,1);
+W0 = WPrev;
 
 scaleBegin = 1e2; %1e2 in the beginning(k=1), 
 scaleEnd = 1e0; %1e0~1e1 in the end (k=maxIter),
@@ -32,15 +27,26 @@ W_history = zeros(Ny*Nx,maxIter+1);
 S_history = zeros(NTheta*NTau,maxIter+1);
 
 for k = 1:maxIter 
+    fprintf('iteration = %d ', k)
 
-    if maxIter > 1
-        paraTwist2{6} = params{6}*(scaleBegin + (k-1)*(scaleEnd-scaleBegin)/(maxIter-1)); 
-    else
-        paraTwist2{6} = params{6}*scaleEnd;
+%     if maxIter > 1
+%         paraTwist2{6} = params{6}*(scaleBegin + (k-1)*(scaleEnd-scaleBegin)/(maxIter-1)); 
+%     else
+%         paraTwist2{6} = params{6}*scaleEnd;
+%     end
+
+    if strcmp(solver,'FLSQR-NNR')
+        [WAll, EnrmAll] = flsqr_nnr(L, S(:), W0, WGT(:), params);
+    elseif strcmp(solver,'IRN-LSQR-NNR')
+        [WAll, ~,~, EnrmAll] = irn_lsqr_nnr(L, S(:), WGT(:), W0, optnnr);
     end
-    W = solveTwist(S(:), L, 'x0', WPrev, paraTwist2{:}); % 5 iters: 21.43/23.45dB without exact scan model, drift error 7.32dB
-    % W = solveWendy(S, L, WGT, WPrev); % 5 iters 21.12/23dB, 10 iters 21.26/23.45dB without exact scan model
+    
+    [~,ind] = min(EnrmAll);
+    W = WAll(:,ind);    
     WPrev = W;
+    W = reshape(W,Ny,Nx);
+    
+    fprintf('best solution given by iteration %d of inner solver\n', ind)
         
     S0 = reshape(L0*W(:), NTheta, NTau);
     drift =  calcDrift(S, S0, maxDrift);
@@ -65,27 +71,13 @@ for k = 1:maxIter
 end
 
 
-% remove all the unused driftAll
-% if k < size(driftAll, 2)
-%     driftAll(:, k) = [];
-% end
-
-
-
-% show final result
-% figNo = figNo + 1;
-% figure(figNo);clf; figNo=figNo+1; plot([driftGT, drift]); legend('drift: GT', 'drift: Rec')
-% SRec = reshape(L*W(:), NTheta, NTau); %%SRec2 = interpSino(S0, drift, 'linear'); difference(SRec2, SRec) % 317.24dB matches well
-% figure(figNo);figNo=figNo+1; multAxes(@imagesc, {WGT, W}); multAxes(@title, {'Ground Truth', 'Reconstruction Final'}); linkAxesXYZLimColorView(); 
-% figure(figNo);figNo=figNo+1; multAxes(@imagesc, {S, SRec}); multAxes(@title, {'Sinogram-Measured', sprintf('Sina-from rec, psnr=%.2fdB', difference(SRec,S))}); linkAxesXYZLimColorView(); 
-% difference(S, SRec)
-
-
 % Final reconstruction use L1-norm
 % P =  genDriftMatrix(drift, NTheta, NTau); L =  P*L0;
-W = solveTwist(S, L, params{:}); 
+[WAll,EnrmAll] = flsqr_nnr(L0, S(:), WPrev, WGT(:), params);
+[~,ind] = min(EnrmAll);
+W = reshape(WAll(:,ind),Ny,Nx);
 figure; imagesc(W); axis image; axis off
-title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', difference(W, WGT), regType, regWt, maxIterA));
+title(sprintf('%s PSNR=%.2fdB', 'Use Interpolated Forward Model', difference(W, WGT)));
 W_history(:,end) = W(:);
 S_history(:,end) = L*W(:);
 

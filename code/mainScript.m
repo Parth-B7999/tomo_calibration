@@ -79,17 +79,17 @@ figure(20); imagesc(WUncalib); axis image; title(sprintf('Baseline, PSNR=%.2fdB,
 
 
 
-%%
+%% Reconstrucion with calibration
 regWt = 1e-5; % use regWtBest(2) where drift is known, or regWtBest(1) where drift is 0
 paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, 'maxSVDofA', maxSVDofA, 'tolA', 1e-8};
 
-[W_history,S_history,infooo] = recTomoDrift_TwIST(WGT,L0,S1,20,...
+[W_history,S_history,infoTwist] = recTomoDrift_TwIST(WGT,L0,S1,20,...
                             maxDrift,LNormalizer,driftGT1,paraTwist);
 
 
 %%
 figNo = 500;
-LExactfromDrift = infooo.LExactfromDrift;
+LExactfromDrift = infoTwist.LExactfromDrift;
 W = solveTwist(S1, LExactfromDrift, paraTwist{:}); 
 figure(figNo+115); imagesc(W); axis image; axis off
 title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Exact Forward Model from Drift', difference(W, WGT), regType, regWt, maxIterA));

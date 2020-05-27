@@ -41,7 +41,7 @@ if(~exist('ind_cr','var'))
 end
 
 % user options to display scan results related to a given sample W
-plotDisBeam =  1;  % display beam movement 
+plotDisBeam =  0;  % display beam movement 
 plotRotation = 0;  % display and debug for COR drift?
 if ~isWDefined
     % force no display when W is not given

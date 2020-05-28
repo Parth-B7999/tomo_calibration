@@ -14,7 +14,7 @@ if ~batchMode
     sampleName = 'Brain';
     maxDrift = 1; % maximum drift error relative to constant scan step size
     maxMaxDriftAll = maxDrift;
-    noiseLevel = 0;
+    noiseLevel = 0.01;
 end
 
 % specify size of test image
@@ -75,7 +75,8 @@ paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 
 
 WUncalib = solveTwist(S1, L0, paraTwist{:});
 
-figure(20); imagesc(WUncalib); axis image; title(sprintf('Baseline, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', difference(WUncalib, WGT), regType, regWt, maxIterA));
+figure(20); imagesc(WUncalib); axis image; axis off
+title(sprintf('Baseline, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', difference(WUncalib, WGT), regType, regWt, maxIterA));
 
 
 
@@ -83,19 +84,21 @@ figure(20); imagesc(WUncalib); axis image; title(sprintf('Baseline, PSNR=%.2fdB,
 regWt = 1e-5; % use regWtBest(2) where drift is known, or regWtBest(1) where drift is 0
 paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, 'maxSVDofA', maxSVDofA, 'tolA', 1e-8};
 
-[W_history,S_history,infoTwist] = recTomoDrift_TwIST(WGT,L0,S1,20,...
+[W_history,S_history,psnr_twist] = recTomoDrift_TwIST(WGT,L0,S1,20,...
                             maxDrift,LNormalizer,driftGT1,paraTwist);
-
-
+%%                        
+Wcalib = reshape(W_history(:,end),Ny,Nx);
+figure,imagesc(Wcalib), axis image, axis off
+title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', psnr_twist(end), regType, regWt, maxIterA));
 %%
-figNo = 500;
-LExactfromDrift = infoTwist.LExactfromDrift;
-W = solveTwist(S1, LExactfromDrift, paraTwist{:}); 
-figure(figNo+115); imagesc(W); axis image; axis off
-title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Exact Forward Model from Drift', difference(W, WGT), regType, regWt, maxIterA));
-
-paraTwist2 = paraTwist;
-paraTwist2{6} = paraTwist2{6}*10; axis off
-W = solveTwist(S1, LExactfromDrift, paraTwist2{:}); 
-figure(figNo+116); imagesc(W); axis image; title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Exact Forward Model from Drift', difference(W, WGT), regType, paraTwist2{6}, maxIterA));
+% figNo = 500;
+% LExactfromDrift = psnr_twist.LExactfromDrift;
+% W = solveTwist(S1, LExactfromDrift, paraTwist{:}); 
+% figure(figNo+115); imagesc(W); axis image; axis off
+% title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Exact Forward Model from Drift', difference(W, WGT), regType, regWt, maxIterA));
+% 
+% paraTwist2 = paraTwist;
+% paraTwist2{6} = paraTwist2{6}*10; axis off
+% W = solveTwist(S1, LExactfromDrift, paraTwist2{:}); 
+% figure(figNo+116); imagesc(W); axis image; title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Exact Forward Model from Drift', difference(W, WGT), regType, paraTwist2{6}, maxIterA));
 

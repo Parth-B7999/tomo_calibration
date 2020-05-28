@@ -1,4 +1,4 @@
-function [W_history,S_history,info] = recTomoDrift_TwIST(WGT,L0,S,maxIter,...
+function [W_history,S_history,psnr_history] = recTomoDrift_TwIST(WGT,L0,S,maxIter,...
                             maxDrift,LNormalizer,driftGT,params)
                         
 % convert the script recTomographyWithDrift.m to a function
@@ -7,9 +7,9 @@ if ~exist('maxDrift', 'var') || isempty(maxDrift)
     maxDrift = 1; 
 end
 
-regType = params{4};
-regWt = params{6};
-maxIterA = params{10};
+% regType = params{4};
+% regWt = params{6};
+% maxIterA = params{10};
 
 
 
@@ -49,18 +49,27 @@ for k = 1:maxIter
     psnr_history(k) = psnr(W, WGT);
     W_history(:,k) = W(:);
     S_history(:,k) = L*W(:);
+            
 
-    
-    P =  genDriftMatrix(drift, NTheta, NTau); L =  P*L0; % update L^k
-    % L = XTM_Tensor_XH(WSz, NTheta, NTau, drift)/LNormalizer;
-    
+    if k < maxIter
+        P =  genDriftMatrix(drift, NTheta, NTau); L =  P*L0; % update L^k
+        % L = XTM_Tensor_XH(WSz, NTheta, NTau, drift)/LNormalizer;
+    end
     
     
     if k>1
         idxNoZero = 25:125;
         fprintf('iter=%d, mean squared error difference of new and old drift: %.2e\n', k, immse(driftAll(idxNoZero, k-1), driftAll(idxNoZero, k)));
         fprintf('iter=%d, mean squared error difference of new and GT drift: %.2e\n', k, immse(driftAll(idxNoZero, k), driftGT(idxNoZero, :)));
-    end    
+    end   
+   
+    if k > 1 && psnr_history(k) < psnr_history(k-1)
+        psnr_history(k:end) = [];
+        W_history(:,k:end) = [];
+        S_history(:,k:end) = [];
+        break
+    end
+        
     
 end
 
@@ -83,13 +92,18 @@ end
 
 % Final reconstruction use L1-norm
 % P =  genDriftMatrix(drift, NTheta, NTau); L =  P*L0;
-W = solveTwist(S, L, params{:}); 
-figure; imagesc(W); axis image; axis off
-title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', difference(W, WGT), regType, regWt, maxIterA));
-W_history(:,end) = W(:);
-S_history(:,end) = L*W(:);
 
-LExactfromDrift = XTM_Tensor_XH(WSz, NTheta, NTau, drift)/LNormalizer;
 
-info.psnr_history = psnr_history;
-info.LExactfromDrift = LExactfromDrift;
+% W = solveTwist(S, L, params{:}); 
+% figure; imagesc(W); axis image; axis off
+% title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', difference(W, WGT), regType, regWt, maxIterA));
+% W_history(:,end) = W(:);
+% S_history(:,end) = L*W(:);
+% 
+% LExactfromDrift = XTM_Tensor_XH(WSz, NTheta, NTau, drift)/LNormalizer;
+% 
+% info.psnr_history = psnr_history;
+% info.LExactfromDrift = LExactfromDrift;
+
+
+

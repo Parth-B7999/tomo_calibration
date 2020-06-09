@@ -1,4 +1,4 @@
-function [X, relerr,relres,U,V,M,T,Z] = flsqr_nnr(A, b, x0,xtrue, parameters)
+function [X, relerr,relres,lambdahis,U,V,M,T,Z] = flsqr_nnr(A, b, x0,xtrue, parameters)
 
 p = parameters.p;
 
@@ -61,12 +61,13 @@ X = zeros(n,k);
 relerr = zeros(k,1);
 relres = relerr;
 
+lambdahis = zeros(k+1,1);
+
 if strcmp(reg,'discrep')
     lambda = 1;
 elseif isnumeric(reg)
     lambda = reg;
 end
-lambdahis = ones(k+1,1);
 
 etaeps = eta*nl;
 

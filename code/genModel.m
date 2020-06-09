@@ -1,5 +1,5 @@
 function [S,L,WGT,LNormalizer] = genModel(sampleName,WGT,WSz,...
-                                     NTheta,NTau, driftGT,noiseLevel,LN)
+                                     NTheta,NTau, driftGT,LN)
 % Input:
 %   sampleName   - Specify a sample object, not case-sensitive.
 %                  If WGT is nonempty, sampleName can be an empty string.
@@ -58,9 +58,5 @@ end
 L = L/LNormalizer;
 S = reshape(L*WGT(:), NTheta, NTau);
 
-% add noise
-rng('default');
-SMax = max(S(:)); 
-S = imnoise(S/SMax, 'gaussian', 0, noiseLevel^2)*SMax;
 end
 

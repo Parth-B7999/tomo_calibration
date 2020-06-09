@@ -1,5 +1,5 @@
-function [W_history,S_history,psnr_history] = recTomoDrift_TwIST(WGT,L0,S,maxIter,...
-                            maxDrift,LNormalizer,driftGT,params)
+function [W_history,S_history,info] = recTomoDrift_TwIST(WGT,L0,L1,S,maxIter,eta,...
+                            maxDrift,epsilon,lambSet,driftGT,params)
                         
 % convert the script recTomographyWithDrift.m to a function
 
@@ -21,26 +21,53 @@ WSz = size(WGT);
 driftAll = zeros(NTau, maxIter); 
 L = L0; 
 
-WPrev = zeros(Ny, Nx);
+WPrev = zeros(Ny, Nx); W = WPrev;
 paraTwist2 = params;
 
 scaleBegin = 1e2; %1e2 in the beginning(k=1), 
 scaleEnd = 1e0; %1e0~1e1 in the end (k=maxIter),
 
 psnr_history = zeros(maxIter,1);
-W_history = zeros(Ny*Nx,maxIter+1);
-S_history = zeros(NTheta*NTau,maxIter+1);
+W_history = zeros(Ny*Nx,maxIter);
+S_history = zeros(NTheta*NTau,maxIter);
+lambda_history = zeros(maxIter,1);
+lambda_history(1) = paraTwist2{6};
+
+regFun_history = zeros(maxIter,1);
+objFun_history = zeros(maxIter,1);
+
+etaeps_history = eta*0.01*norm(S(:))*ones(maxIter,1);    
+
+% epsilon = noiseLevel*norm(S(:));
+
 
 for k = 1:maxIter 
 
-    if maxIter > 1
-        paraTwist2{6} = params{6}*(scaleBegin + (k-1)*(scaleEnd-scaleBegin)/(maxIter-1)); 
-    else
-        paraTwist2{6} = params{6}*scaleEnd;
+    if strcmp(lambSet,'old') == 1
+        if maxIter > 1
+            paraTwist2{6} = (1/scaleBegin)*params{6}*(scaleBegin + (k-1)*(scaleEnd-scaleBegin)/(maxIter-1)); 
+        else
+            paraTwist2{6} = (1/scaleBegin)*params{6}*scaleEnd;
+        end
     end
-    W = solveTwist(S(:), L, 'x0', WPrev, paraTwist2{:}); % 5 iters: 21.43/23.45dB without exact scan model, drift error 7.32dB
-    % W = solveWendy(S, L, WGT, WPrev); % 5 iters 21.12/23dB, 10 iters 21.26/23.45dB without exact scan model
+
+%     etaeps_history(k) = etaeps_history(k)/(1.5^(k-1));
+
+    eta = IRnormest(L1-L,S(:));
+%     etaeps_history(k) = eta + epsilon;
+    etaeps_history(k) = norm(epsilon + (L-L1)*WGT(:));
+    lambda_history(k) = paraTwist2{6};
+    
+    [W,~,objFunVals,~,~,~,~,regFunVals] = solveTwist(S(:), L, 'x0', WPrev, paraTwist2{:}); 
     WPrev = W;
+    
+    regFun_history(k) = paraTwist2{6}*regFunVals(end);
+    objFun_history(k) = objFunVals(end);
+    alpha = objFunVals(end);
+    beta = regFunVals(end);
+    paraTwist2{6} = abs((etaeps_history(k) - alpha)/beta);
+    
+
         
     S0 = reshape(L0*W(:), NTheta, NTau);
     drift =  calcDrift(S, S0, maxDrift);
@@ -63,12 +90,12 @@ for k = 1:maxIter
         fprintf('iter=%d, mean squared error difference of new and GT drift: %.2e\n', k, immse(driftAll(idxNoZero, k), driftGT(idxNoZero, :)));
     end   
    
-    if k > 1 && psnr_history(k) < psnr_history(k-1)
-        psnr_history(k:end) = [];
-        W_history(:,k:end) = [];
-        S_history(:,k:end) = [];
-        break
-    end
+%     if k > 1 && psnr_history(k) < psnr_history(k-1)
+%         psnr_history(k:end) = [];
+%         W_history(:,k:end) = [];
+%         S_history(:,k:end) = [];
+%         break
+%     end
         
     
 end
@@ -106,4 +133,9 @@ end
 % info.LExactfromDrift = LExactfromDrift;
 
 
-
+info.psnr_history = psnr_history;
+info.lambda_history = lambda_history;
+info.regFun_history = regFun_history;
+info.objFun_history = objFun_history;
+info.etaeps_history = etaeps_history;
+%etaeps

@@ -4,7 +4,8 @@
 % maximum is maxMaxDriftAll
 
 %% Generate Model: 
-clear
+clear, close all
+
 
 if ~exist('batchMode', 'var') || isempty(batchMode)
     batchMode = false; 
@@ -14,7 +15,7 @@ if ~batchMode
     sampleName = 'Brain';
     maxDrift = 1; % maximum drift error relative to constant scan step size
     maxMaxDriftAll = maxDrift;
-    noiseLevel = 0.01;
+    noiseLevel = 0.0;
 end
 
 % specify size of test image
@@ -38,7 +39,7 @@ driftGT1(1:ceil(maxMaxDriftAll)) = 0;
 driftGT1(end-ceil(maxMaxDriftAll)+1:end) = 0;
 [S1,L1] = genModel('',WGT,WSz,NTheta,NTau,driftGT1,noiseLevel,LNormalizer);
 
-%%
+
 x0 = zeros(Nx*Ny,1);
 optnnr.eta = 1.01;
 optnnr.nl = noiseLevel;
@@ -46,7 +47,7 @@ optnnr.nl = noiseLevel;
 %% FLSQR-NNR(v)
 optnnr.p = 1;
 optnnr.maxIt = 100;
-optnnr.reg = 0;
+optnnr.reg = 'discrep';
 optnnr.eta = 1.01;
 optnnr.nl = noiseLevel;
 optnnr.svdbasis = 'v';
@@ -64,18 +65,18 @@ Wfnnrv = X_fnnrv(:,ind);
 Wfnnrv(Wfnnrv <0) = 0;
 Wfnnrv = reshape(Wfnnrv,Ny,Nx);
 figure,imagesc(Wfnnrv), axis image, axis off
-title(sprintf('FLSQR-NNR(v), PSNR=%.2fdB, Iter %d', psnr(Wfnnrv,WGT), ind));
+% title(sprintf('FLSQR-NNR(v), PSNR=%.2fdB, Iter %d', psnr(Wfnnrv,WGT), ind));
 
 
 
 %% block coordinate descent
 optnnr.reg = 0;
-[Whis_fnnrv,Shis_fnnrv,psnr_fnnrv] = recTomoDrift_Chang(WGT,L0,S1,20,...
+[Whis_fnnrv,Shis_fnnrv,info_fnnrv] = recTomoDrift_Chang(WGT,L0,S1,20,...
                             'FLSQR-NNR',maxDrift,LNormalizer,driftGT1,optnnr);
 
 Wcalib_fnnrv = reshape(Whis_fnnrv(:,end),Ny,Nx);                       
 figure,imagesc(Wcalib_fnnrv), axis image, axis off
-title(sprintf('%s PSNR=%.2fdB', 'Use Interpolated Forward Model', psnr_fnnrv(end)));
+title(sprintf('FLSQR-NNR(v) %s PSNR=%.2fdB', 'Use Interpolated Forward Model', info_fnnrc.psnr_history(end)));
 %% FLSQR-NNR
 optnnr.p = 1;
 optnnr.maxIt = 100;
@@ -102,12 +103,12 @@ figure,imagesc(Wfnnr), axis image, axis off
 title(sprintf('FLSQR-NNR, PSNR=%.2fdB, Iter %d', psnr(Wfnnr,WGT), ind));
 
 %% IRN-LSQR-NNR
-optnnr.p = 2;
+optnnr.p = 1;
 optnnr.gamma = 10^-10;
 optnnr.maxIt = 25;
 optnnr.cycles = 4;
 optnnr.thr = 1e-3;
-optnnr.reg = 0;
+optnnr.reg = 'discrep';
 optnnr.weigthtype = 'sqrt'; 
 optnnr.thrstop = 1e-8;
 
@@ -126,5 +127,62 @@ figure,imagesc(Wirn), axis image, axis off
 title(sprintf('IRN-LSQR-NNR, PSNR=%.2fdB, Iter %d', psnr(Wirn,WGT), ind));
 
 %% 
-[Whis_irn,Shis_irn,info_irn] = recTomoDrift_Chang(WGT,L0,S1,10,...
+[Whis_irn,Shis_irn,info_irn] = recTomoDrift_Chang(WGT,L0,S1,20,...
                             'IRN-LSQR-NNR',maxDrift,LNormalizer,driftGT1,optnnr);
+
+                 
+Wcalib_irn = reshape(Whis_irn(:,end),Ny,Nx);                       
+figure,imagesc(Wcalib_irn), axis image, axis off
+title(sprintf('IRN-LSQR %s PSNR=%.2fdB', 'Use Interpolated Forward Model', info_irn.psnr_history(end)));
+
+
+figure, 
+yyaxis left, plot(info_irn.obj_history,'linewidth',1.5)
+yyaxis right, plot(info_irn.psnr_history,'linewidth',1.5)
+legend('obj. function','psnr')
+set(gca,'fontsize',16)
+
+figure,
+semilogy(info_irn.lambda_history,'linewidth',1.5)
+legend('history of \lambda')
+set(gca,'fontsize',16)
+
+%%
+optnnr.maxIt = 100; optnnr.reg = 0;
+optnnr.kappa = 0; optnnr.kappaB = 0; optnnr.iftrun = 0; optnnr.tau = 0;
+[W_lsqr, Enrm_lsqr] = LRlsqr(L0, S0(:), x0,WGT(:), optnnr);
+
+[~,ind] = min(Enrm_lsqr)
+
+Wlsqr = W_lsqr(:,ind);
+Wlsqr(Wlsqr <0) = 0;
+Wlsqr = reshape(Wlsqr,Ny,Nx);
+figure,imagesc(Wlsqr), axis image, axis off
+title(sprintf('IRN-LSQR-NNR, PSNR=%.2fdB, Iter %d', psnr(Wlsqr,WGT), ind));
+
+%%
+optnnr.maxIt = 100; optnnr.reg = 0;
+optnnr.kappa = 0; optnnr.kappaB = 0; optnnr.iftrun = 0; optnnr.tau = 0;
+[Whis_lsqr,Shis_lsqr,info_lsqr] = recTomoDrift_Chang(WGT,L0,S0,20,...
+                            'LSQR',maxDrift,LNormalizer,driftGT1,optnnr);
+ 
+Wcalib_lsqr = reshape(Whis_lsqr(:,end),Ny,Nx);                       
+figure,imagesc(Wcalib_lsqr), axis image, axis off
+title(sprintf('LSQR %s PSNR=%.2fdB', 'Use Interpolated Forward Model', info_lsqr.psnr_history(end)));     
+
+
+figure, 
+yyaxis left, plot(info_lsqr.obj_history,'linewidth',1.5)
+[m,i] = min(info_lsqr.obj_history);
+hold on, plot(i,m,'p','markersize',12,'linewidth',1.5)
+yyaxis right, plot(info_lsqr.psnr_history,'linewidth',1.5)
+[m,i] = max(info_lsqr.psnr_history);
+hold on, plot(i,m,'p','markersize',12,'linewidth',1.5)
+legend('obj. function','obj. min', 'psnr', 'psnr max')
+set(gca,'fontsize',16)                        
+     
+                
+figure,
+semilogy(info_lsqr.lambda_history,'linewidth',1.5)  
+legend('history of \lambda')
+set(gca,'fontsize',16)

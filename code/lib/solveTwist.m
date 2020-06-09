@@ -131,9 +131,9 @@ for k = 1:maxIterA
                 % if monotonicity  fails here  is  because  TODO: set max eig(A'A) to 1 before the solver, for normalization
                 % max eig (A'A) > 1. Thus, we increase our guess of max_svs
                 maxSVDofA = 2*maxSVDofA;
-                if verbose
-                    fprintf('Incrementing S=%2.2e\n',maxSVDofA)
-                end
+%                 if verbose
+%                     fprintf('Incrementing S=%2.2e\n',maxSVDofA)
+%                 end
                 IST_iters = 0;
                 TwIST_iters = 0;
             else
@@ -149,7 +149,7 @@ for k = 1:maxIterA
     sampledHist = solver.updateSampledHist(sampledHist, x, cpuTimes, k, sampleInterval); % Only keep x history every sampleInterval
     
     criterion = solver.calcConvergeCriterion(stopCriterion, objFunVals(k), objFunVals(k+1), xm1, x, xGT); 
-    solver.printAlgorithmIterK('k', k, 'verbose', verbose, 'x', x, 'objFunVals', objFunVals, 'criterionVsTol', criterion/tolA, 'regWt', regWt, 'regFun', regFun, 'xGT', xGT);   
+%    solver.printAlgorithmIterK('k', k, 'verbose', verbose, 'x', x, 'objFunVals', objFunVals, 'criterionVsTol', criterion/tolA, 'regWt', regWt, 'regFun', regFun, 'xGT', xGT);   
     
     if (criterion<=tolA) && (k>minIterA); break;  end    % stop if converged.     
 end

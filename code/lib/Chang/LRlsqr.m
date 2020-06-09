@@ -50,12 +50,15 @@ nim = sqrt(n);
 
 etaeps = eta*nl;
 
+lambdahis = zeros(k,1);
+
 if strcmp(reg,'discrep')
     lambda = 1;
 elseif isnumeric(reg)
     lambda = reg;
 end
-lambdahis = ones(k,1);
+
+
 
 
 for i = 1:k

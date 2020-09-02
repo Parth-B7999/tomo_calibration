@@ -55,7 +55,8 @@ end
 
 more off;
 % physical unit of object
-Tol = 1e-2; % ??
+% Tol = 1e-2; % ??
+Tol = 1e-3;
 omega = [-1,  1,  -WSz(1)/WSz(2),  WSz(1)/WSz(2)].*Tol; %omega = [-1     1    -1     1].*Tol; % XH: [xMin, xMax yMin yMax] in physical unit
 dxdy = [(omega(2)-omega(1))/WSz(2) (omega(4)-omega(3))/WSz(1)]; % pixel size for [x,y] in physical unit? dx/dy
 assert( abs(dxdy(1)/dxdy(2)-1) < eps, 'Currently we need to assume object has square pixel size dx = dy!');

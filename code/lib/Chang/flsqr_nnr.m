@@ -1,4 +1,4 @@
-function [X, relerr,relres,lambdahis,U,V,M,T,Z] = flsqr_nnr(A, b, x0,xtrue, parameters)
+function [X, relerr,relres,objhis,lambdahis,alphahis,U,V,M,T,Z] = flsqr_nnr(A, b, x0,xtrue, parameters)
 
 p = parameters.p;
 
@@ -60,11 +60,13 @@ V = zeros(n,k+1);
 X = zeros(n,k);
 relerr = zeros(k,1);
 relres = relerr;
+objhis = relerr;
 
 lambdahis = zeros(k+1,1);
+alphahis = zeros(k,1);
 
 if strcmp(reg,'discrep')
-    lambda = 1;
+    lambda = parameters.RegParam0;
 elseif isnumeric(reg)
     lambda = reg;
 end
@@ -137,7 +139,7 @@ for i = 1:k
     
     [UM,SM,VM] = svd(M(1:i+1,1:i));
     lsqr_res = abs((UM(:,i+1)'*d))/normb;
-%     
+    
 %     c = UM'*d;
 %     
 %     if i == 1
@@ -146,20 +148,40 @@ for i = 1:k
 %         SM = diag(SM);
 %     end
 %     
-%     Filt = SM.^2 + lambda;
+%     Filt = SM.^2 + lambda; Filt0 = SM.^2;
 %     y = VM*((SM.*c(1:i))./Filt);
+%     
+%     y0 = VM*((SM.*c(1:i))./Filt0);
+%     alphahis(i) = norm(M(1:i+1,1:i)*y0 - d)/normb;
 
     y = [M(1:i+1,1:i); sqrt(lambda)*Rtemp]\[d; zeros(i,1)];
+    y0 = M(1:i+1,1:i)\d;
+    alphahis(i) = norm(M(1:i+1,1:i)*y0 - d)/normb;
     
-    relres(i) = norm(M(1:i+1,1:i)*y - d)/normb;
+    resi = norm(M(1:i+1,1:i)*y - d);
+    relres(i) = resi/normb;
     
-    if strcmp(reg,'discrep')
-        lambda = abs((etaeps-lsqr_res)/(relres(i)-lsqr_res))*lambda;
-        lambdahis(k+1) = lambda; 
-    end
     
     x = x0 + Z(:,1:i)*y;
     X(:,i) = x;
+    
+    XX = reshape(x,nim,nim);
+    sx = svd(XX);
+    objhis(i) = resi^2 + lambda*sum(sx);
+    
+    
+    
+    
+    if strcmp(reg,'discrep')
+%         etaeps
+%         lsqr_res
+%         relres(i)
+%         lambda
+        lambda = abs((etaeps-lsqr_res)/(relres(i)-lsqr_res))*lambda;
+        lambdahis(i+1) = lambda; 
+    end
+    
+
     
     if strcmp(svdbasis,'x') 
         Xtemp = reshape(x,nim,nim);
@@ -173,6 +195,7 @@ for i = 1:k
 
 
     relerr(i) = norm(xtrue - X(:,i))/normxtrue;
+    
     
     
 end        

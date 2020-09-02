@@ -24,5 +24,6 @@ DetKnot0    = [repmat(-halfDist, NTau,1), knot];  % NTau*2 matrix, each row is t
 
 
 %%%=========== Assign Projection Angles;
-%Theta = linspace(1, 360, NTheta) * pi/180;% XH: original code by Wendy, bad, as need 360 -> 180 to avoid duplicate, and start with 0 is more natural
-Theta = (0:(NTheta-1)) * pi/NTheta; % same as linspace(0, 180-180/NTheta, NTheta);
+Theta = linspace(0, 180, NTheta+1) * pi/180; Theta = Theta(1:NTheta);
+% Theta = linspace(1, 180, NTheta) * pi/180;  % XH: original code by Wendy, bad, as need 360 -> 180 to avoid duplicate, and start with 0 is more natural
+% Theta = (0:(NTheta-1)) * pi/NTheta; % same as linspace(0, 180-180/NTheta, NTheta);

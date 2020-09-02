@@ -3,7 +3,7 @@ function [S,L,WGT,LNormalizer] = genModel(sampleName,WGT,WSz,...
 % Input:
 %   sampleName   - Specify a sample object, not case-sensitive.
 %                  If WGT is nonempty, sampleName can be an empty string.
-%                  [ 'Phantom' | 'Brain' | ''Golosio' | 'circle' |
+%                  [ 'Phantom' | 'Brain' | 'Golosio' | 'circle' |
 %                   'checkboard' | 'fakeRod'| '' ]
 %   WGT          - Groundtruth of sample object.
 %                  If WGT needs to be generated, need to specify sampleName.

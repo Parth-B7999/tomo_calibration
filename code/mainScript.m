@@ -11,7 +11,7 @@ if ~exist('batchMode', 'var') || isempty(batchMode)
 end
 
 if ~batchMode 
-    sampleName = 'Brain';
+    sampleName = 'Phantom';
     maxDrift = 1; % maximum drift error relative to constant scan step size
     maxMaxDriftAll = maxDrift;
     noiseLevel = 0.01;
@@ -27,12 +27,25 @@ NTau = NTau + rem(NTau-Ny,2);
 
 % generate test image, forward operator and sinogram WITHOUT drift error
 driftGT0 = 0; 
+
+% create smooth object using Gaussian filter
+% WGT = createObject(sampleName,WSz);
+% WGT = smooth2a(WGT,2,2);
+% [~,~,x] = PRtomo(100,struct('phantomImage','smooth'));
+% WGT = reshape(x,Ny,Nx);
+
 [S0,L0,WGT,LNormalizer] = genModel(sampleName,[],WSz,NTheta,NTau,driftGT0,0);
+
+% [L0, varargout] = build_weight_matrix_area(WGT, 0:4:176,1);
+% S0 = L0*WGT(:); S0 = reshape(S0,NTheta,NTau);
 
 % add noise
 rng('default');
 SMax = max(S0(:)); 
-S0 = imnoise(S0/SMax, 'gaussian', 0, noiseLevel^2)*SMax;
+S01 = imnoise(S0/SMax, 'gaussian', 0, 0.01^2)*SMax; % noiseLevel = 0.01
+S02 = imnoise(S0/SMax, 'gaussian', 0, 0.02^2)*SMax; % noiseLevel = 0.02
+S03 = imnoise(S0/SMax, 'gaussian', 0, 0.03^2)*SMax; % noiseLevel = 0.03
+S05 = imnoise(S0/SMax, 'gaussian', 0, 0.05^2)*SMax; % noiseLevel = 0.05
 
 % using the same test image WGT, generate forward operator and 
 % sinogram WITH drift error
@@ -40,37 +53,16 @@ rng('default');
 driftGT1 = (2*rand(NTau, 1)- 1) * maxDrift;
 driftGT1(1:ceil(maxMaxDriftAll)) = 0; 
 driftGT1(end-ceil(maxMaxDriftAll)+1:end) = 0;
-[S1_0,L1_0] = genModel('',WGT,WSz,NTheta,NTau,driftGT1,LNormalizer);
+[S10,L1] = genModel('',WGT,WSz,NTheta,NTau,driftGT1,LNormalizer);
 
 % add noise
 rng('default');
-SMax = max(S1_0(:)); 
-S1 = imnoise(S1_0/SMax, 'gaussian', 0, noiseLevel^2)*SMax;
-
-%% Show W and S
-figNo = 10;
-figure(figNo+1); imagesc(WGT); axis image; axis off; 
-title('Object Ground Truth');
-
-figure(figNo+2); imagesc(S0); axis image; axis off; 
-title('Sinogram Without drift');
-
-figure(figNo+3); imagesc(S1); axis image; axis off; 
-title(sprintf('Sinogram With drift, PSNR=%.2fdB', difference(S1, S0)));
-tilefigs;
-
-%% How good is calclating drift given the true sinogram pairs ??
-
-interpMethods = {'linear', 'quadratic'}; 
-driftComputed = calcDrift(S1, S0, maxDrift, interpMethods{1});
-% zero out the ground truth for the begin and end empty beams. 
-iStart = find(cumsum(driftComputed), 1, 'first');
-iEnd = NTau + 1 - find(cumsum(driftComputed(end:-1:1)), 1, 'first');
-idxHasDrift = iStart:iEnd;
-idxNoDrift = [1:iStart-1, iEnd+1:NTau];
-
-driftGT2 = driftGT1;         driftGT2(idxNoDrift) = 0;
-figure(1001), clf; plot([driftGT2, driftComputed], '-x'); title(sprintf('psnr=%.2fdB', difference(driftComputed, driftGT2))); legend('GT', 'rec-testInterp'); grid on; grid minor; %driftComputed-driftGT2, 'dif'
+SMax = max(S10(:)); 
+S11 = imnoise(S10/SMax, 'gaussian', 0, 0.01^2)*SMax; % noiseLevel = 0.01
+S12 = imnoise(S10/SMax, 'gaussian', 0, 0.02^2)*SMax; % noiseLevel = 0.02
+S13 = imnoise(S10/SMax, 'gaussian', 0, 0.03^2)*SMax; % noiseLevel = 0.03
+S15 = imnoise(S10/SMax, 'gaussian', 0, 0.05^2)*SMax; % noiseLevel = 0.05
+S110 = imnoise(S10/SMax, 'gaussian', 0, 0.1^2)*SMax; % noiseLevel = 0.1
 
 
 %% Reconstruction with solver from XH, with L1/TV regularizer.
@@ -79,82 +71,74 @@ figure(1001), clf; plot([driftGT2, driftComputed], '-x'); title(sprintf('psnr=%.
 regType = 'TV'; % 'TV' or 'L1' % TV is better and cleaner for phantom example
 maxIterA = 100; % 100 is not enough
 % regWt = 1e-16;
-regWt = 1e-5; % 1e-5 or 1e-8*max(WGT(:))/LNormalizer^2;  1e-6 to 1e-8 both good for phantom, use 1e-8 for brain, especically WGT is scaled to maximum of 1 not 40
+regWtspace = logspace(-5,-1,20); % 1e-5 or 1e-8*max(WGT(:))/LNormalizer^2;  1e-6 to 1e-8 both good for phantom, use 1e-8 for brain, especically WGT is scaled to maximum of 1 not 40
 maxSVDofA = 1e-4; % for TV, maxSVDofA = 1e-5/1e-4 or 1e-6/LNormalizer^2 NOT maxSVDofA = 1e-6/LNormalizer,  make sure it is actually much smaller than svds(L, 1), so that first step in TwIST is long enough 
-paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, 'maxSVDofA', maxSVDofA, 'tolA', 1e-8};
 
-WUncalib = solveTwist(S0, L1, paraTwist{:});
+res_vec = zeros(length(regWtspace),1);
+wnorm_vec = zeros(length(regWtspace),1);
 
-%
-figure(20); imagesc(WUncalib); axis image; axis off
-title(sprintf('Baseline, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', difference(WUncalib, WGT), regType, regWt, maxIterA));
+regWt = 0.001;
+paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, 'maxSVDofA', maxSVDofA, 'tolA', 1e-4};
+WUncalib = solveTwist(S13, L0, paraTwist{:});
 
+figure, imagesc(WUncalib); axis image; axis off
+% title(sprintf('Baseline, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', difference(WUncalib, WGT), regType, regWt, maxIterA));
 
 
 %% Reconstrucion with calibration OLD
+solver = 'TwIST';
+SS = S13;
+noiseLevel = 0.01; optnnr.nl = norm(L1*WGT(:)-SS(:))/norm(SS(:));
 regType = 'TV';
-maxIter = 20;
-maxIterA = 100;
+maxIter = 10;
+maxIterA = 500;
 maxSVDofA = 1e-4;
-regWt = 0.001; 
-paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, 'maxSVDofA', maxSVDofA, 'tolA', 1e-8};
+% regWt = noiseLevel/5;
+% regWt = (0.1+maxDrift*0.01)*noiseLevel; 
+% regWt = (0.001 + noiseLevel*0.02)*maxDrift;
+% regWt = (0.001 + 0.03*noiseLevel)*(1+0.65*maxDrift^2)
+regWt = (0.001 + 0.02*noiseLevel)*(1+0.15*maxDrift^2); 
+regWt = 0.001;
+% optnnr.reg = regWt; optnnr.RegParam0 = regWt;
+paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, ...
+    'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, ...
+    'maxSVDofA', maxSVDofA, 'tolA', 1e-4,'verbose',0};
 
-[W_history_old,S_history_old,info_twist_old] = recTomoDrift_TwIST(WGT,L0,L1,S1,maxIter,2,...
-                            maxDrift,noiseLevel,'old',driftGT1,paraTwist);
 
+[W_history_old,S_history_old,info_twist_old] = recTomoDrift_TwIST(WGT,L0,L1,SS,maxIter,solver,...
+                            maxDrift,'old',regWt,1e-4,driftGT1,paraTwist,optnnr);
                       
-% [~,ind] = max(info_twist.psnr_history)                     
-Wcalib = reshape(W_history_old(:,end),Ny,Nx);
-figure(21),imagesc(Wcalib), axis image, axis off
-title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', info_twist_old.psnr_history(end), regType, regWt, maxIterA));
+
+% Reconstrucion with calibration NEW
+[W_history,S_history,info_twist] = recTomoDrift_TwIST(WGT,L0,L1,SS,maxIter,solver,...
+                            maxDrift,'new',regWt,0,driftGT1,paraTwist,optnnr);
 
 
-
-%% Reconstrucion with calibration NEW
-regType = 'TV';
-maxIter = 20;
-maxIterA = 100;
-maxSVDofA = 1e-4;
-regWt = 0.001; 
-paraTwist = {'xSz', WSz, 'regFun', regType, 'regWt', regWt, 'isNonNegative', 1, 'maxIterA', maxIterA, 'xGT', WGT, 'maxSVDofA', maxSVDofA, 'tolA', 1e-8};
-
-epsilon = S1(:) - S1_0(:);
-[W_history,S_history,info_twist] = recTomoDrift_TwIST(WGT,L0,L1,S1,maxIter,2,...
-                            maxDrift,epsilon,'new',driftGT1,paraTwist);
-
-
-
-% [~,ind] = max(info_twist.psnr_history)                     
-Wcalib = reshape(W_history(:,end),Ny,Nx);
-figure(21),imagesc(Wcalib), axis image, axis off
-title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Interpolated Forward Model', info_twist.psnr_history(end), regType, regWt, maxIterA));
-
-
-
+% plot figures
 figure, 
-yyaxis left, plot(info_twist.objFun_history-info_twist.regFun_history,'linewidth',1.5)
+yyaxis left, plot(0:length(info_twist.misfit_history)-1,info_twist.misfit_history,'linewidth',1.5)
 hold on 
-plot(info_twist_old.objFun_history-info_twist_old.regFun_history,'linewidth',1.5)
+plot(0:length(info_twist_old.misfit_history)-1,info_twist_old.misfit_history,'linewidth',1.5)
+% plot(0:length(info_twist_twist.misfit_history)-1,info_twist_twist.misfit_history,'linewidth',1.5)
 
-yyaxis right, plot(info_twist.psnr_history,'linewidth',1.5)
+yyaxis right, plot(0:length(info_twist.misfit_history)-1,info_twist.psnr_history,'linewidth',1.5)
 
-hold on, plot(info_twist_old.psnr_history,'linewidth',1.5)
-legend('obj. new','obj. old', 'psnr new', 'psnr old')
+hold on, plot(0:length(info_twist_old.psnr_history)-1,info_twist_old.psnr_history,'linewidth',1.5)
+% plot(0:length(info_twist_twist.psnr_history)-1,info_twist_twist.psnr_history,'linewidth',1.5)
+legend('misfit new','misfit old','psnr new', 'psnr old')
+% legend('misfit new','misfit dis', 'misfit twist','psnr new', 'psnr dis','psnr twist')
 set(gca,'fontsize',16)      
 
+
 figure,
-plot(info_twist.lambda_history)
+plot(0:length(info_twist.lambda_history)-1,info_twist.lambda_history,'linewidth',1.5)
+hold on, plot(0:length(info_twist_old.lambda_history)-1,info_twist_old.lambda_history,'linewidth',1.5)
+legend('new lambda','old lambda')
+set(gca,'fontsize',16)   
 
 
-%%
-% figNo = 500;
-% LExactfromDrift = psnr_twist.LExactfromDrift;
-% W = solveTwist(S1, LExactfromDrift, paraTwist{:}); 
-% figure(figNo+115); imagesc(W); axis image; axis off
-% title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Exact Forward Model from Drift', difference(W, WGT), regType, regWt, maxIterA));
-% 
-% paraTwist2 = paraTwist;
-% paraTwist2{6} = paraTwist2{6}*10; axis off
-% W = solveTwist(S1, LExactfromDrift, paraTwist2{:}); 
-% figure(figNo+116); imagesc(W); axis image; title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', 'Use Exact Forward Model from Drift', difference(W, WGT), regType, paraTwist2{6}, maxIterA));
-
+figure, imagesc(WUncalib); axis image; axis off
+Wcalib = reshape(W_history_old(:,end),Ny,Nx);
+figure,imagesc(Wcalib), axis image, axis off
+Wcalib = reshape(W_history(:,end),Ny,Nx);
+figure,imagesc(Wcalib), axis image, axis off

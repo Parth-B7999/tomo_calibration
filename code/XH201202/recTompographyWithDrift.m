@@ -1,4 +1,4 @@
-function [WRec, SRec, L, drift, driftAll, info] = recTompographyWithDrift(S, paraTwist, WSz, maxDrift, driftGT,lambset,normeps)
+function [WRecs, SRecs, L, drift, driftAll, info] = recTompographyWithDrift(S, paraTwist, WSz, maxDrift, driftGT,lambset,normeps)
 % S:  Measured sinogram with drift
 % paraTwist:  required
 % WSz:  size of object, optional, but if paraTwist doesn't contain valid xGT, WSz must be defined
@@ -52,8 +52,12 @@ L = L0;
 
 
 psnr_history = zeros(maxIter,1);
+ssim_history = zeros(maxIter,1);
 lambda_history = zeros(maxIter,1);
 misfit_history = zeros(maxIter,1);
+
+WRecs = zeros(WSz(1)*WSz(2), maxIter);
+SRecs = zeros(NTheta*NTau, maxIter);
 
 
 for k = 1:maxIter        % wny after 10 iter, may slightly worse?
@@ -120,6 +124,13 @@ for k = 1:maxIter        % wny after 10 iter, may slightly worse?
         SRec = reshape(L*WRec(:), SSz); 
         figure(figNo);figNo=figNo+1; multAxes(@imagesc, {S, SRec}); multAxes(@title, {'Sino-Measured', sprintf('Sina-Rec, psnr=%.2fdB', difference(SRec,S))}); linkAxesXYZLimColorView(); 
     end
+    
+    SS = L*WRec(:);
+    SRecs(:,k) = SS; WRecs(:,k) = WRec(:);
+    resid = SS(:)-S(:);
+    misfit_history(k) = 0.5*(resid'*resid);
+    psnr_history(k) = psnr(WRec,WGT);
+    ssim_history(k) = ssim(WRec,WGT);
 
     %%
     % (II) Update L
@@ -142,14 +153,12 @@ for k = 1:maxIter        % wny after 10 iter, may slightly worse?
         fprintf('iter=%d, mean squared error difference of new and GT drift: %.2e\n', k, immse(driftAll(idxNoZero, k), driftGT(idxNoZero, :)));
     end    
     
-    psnr_history(k) = psnr(WRec,WGT);
-    SS = L*WRec(:);
-    resid = SS(:)-S(:);
-    misfit_history(k) = 0.5*(resid'*resid);
+
 
 end
 
 info.psnr_history = psnr_history;
+info.ssim_history = ssim_history;
 info.misfit_history = misfit_history;
 info.lambda_history = lambda_history;
 

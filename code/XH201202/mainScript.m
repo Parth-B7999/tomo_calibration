@@ -31,7 +31,7 @@ if ~exist('batchMode', 'var') || isempty(batchMode); batchMode = false; end
 if ~batchMode
     sampleName = 'Phantom'; % choose from {'Phantom', 'Brain', ''Golosio', 'circle', 'checkboard', 'fakeRod'}; not case-sensitive
 end
-Nx = 256; Ny = Nx; WSz = [Ny, Nx]; %  XH: Ny = 100 -> 10 or 50 for debug.  currently assume object shape is square not general rectangle
+Nx = 100; Ny = Nx; WSz = [Ny, Nx]; %  XH: Ny = 100 -> 10 or 50 for debug.  currently assume object shape is square not general rectangle
 WGT = createObject(sampleName, WSz); WGT = WGT/max(WGT(:)); assert(all(WGT(:)>=0), 'Groundtruth object should be nonnegative');% Object without noise. always assume WGT0 is normailzed with maximum 1.
 
 % (2) Scan Object: Create Forward Model and Sinograms
@@ -52,7 +52,7 @@ driftGTAll = {0, []}; % Two Scans: 1st one no drift error.
 
 %% Generate drift error in pixel units for 2nd Scan
 rng('default'); % same random number for repeatable test
-driftType = 3;
+driftType = 1;
 if driftType == 1
     % (1) Type I Drift (systematic beam drift). Assume same drift for all the angles for the same beam. NTau*1 or 1*NTau unknowns
     %TODO: change from NTau*1 to 1*NTau, so that could match Ntheta*NTau dimension in correct order

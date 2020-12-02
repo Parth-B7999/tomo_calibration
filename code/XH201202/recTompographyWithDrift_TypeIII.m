@@ -1,4 +1,4 @@
-function [WRec, SRec, drift, driftAll,info] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT, maxIter,lambset,normeps)
+function [WRecs, SRecs, drift, driftAll,info] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT, maxIter,lambset,normeps)
 %   Sm: the Sinogram with beamline drifted, NTheta*NTau 2D matrix, normally from measurement
 %% TODO: comments
 % TODO: merge recTompographyWithDrift_rotation() and recTompographyWithDrift()
@@ -54,8 +54,12 @@ is_use_exact_forward_model = true; %% TODO: CHANGE-back to true
 
 
 psnr_history = zeros(maxIter,1);
+ssim_history = zeros(maxIter,1);
 lambda_history = zeros(maxIter,1);
 misfit_history = zeros(maxIter,1);
+
+WRecs = zeros(WSz(1)*WSz(2), maxIter);
+SRecs = zeros(NTheta*NTau, maxIter);
 
 for k = 1:maxIter        % When use 10 Iter, wny after 10 iter, may slightly worse?
     %paraTwist2{6} = paraTwist{6}*1e2; %{'xSz'}    {1×2 double}    {'regFun'}    {'TV'}    {'regWt'}    {[4.0000e-07]} 
@@ -153,10 +157,13 @@ for k = 1:maxIter        % When use 10 Iter, wny after 10 iter, may slightly wor
     end
     
     psnr_history(k) = psnr(WRec,WGT);
+    ssim_history(k) = ssim(WRec,WGT);
     SS = L*WRec(:);
     resid = SS(:)-Sm(:);
     misfit_history(k) = 0.5*(resid'*resid);
     WPrev = WRec;
+    WRecs(:,k) = WRec(:);
+    SRecs(:,k) = SS(:);
 end
 
 
@@ -164,5 +171,6 @@ if k < size(driftAll, 2); driftAll = driftAll(:, :, 1:k); end % remove all the u
 
 
 info.psnr_history = psnr_history;
+info.ssim_history = ssim_history;
 info.misfit_history = misfit_history;
 info.lambda_history = lambda_history;

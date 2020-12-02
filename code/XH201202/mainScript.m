@@ -168,13 +168,13 @@ normeps = norm(LAll{2}*WGT(:)-Sm(:));
 paraTwist{6} = 1.3e-3; % initial lambda_0
 paraTwist{16} = 1e-4;
 if driftType == 1
-    [WRec, SRec, L, drift, driftAll, info] = recTompographyWithDrift(Sm, paraTwist, [], maxDrift, driftGT,'new',normeps);
-    [WRec_old, SRec_old, L_old, drift_old, driftAll_old, info_old] = recTompographyWithDrift(Sm, paraTwist, [], maxDrift, driftGT,'old',normeps);
+    [WRecs, SRecs, L, drift, driftAll, info] = recTompographyWithDrift(Sm, paraTwist, [], maxDrift, driftGT,'new',normeps);
+    [WRecs_old, SRecs_old, L_old, drift_old, driftAll_old, info_old] = recTompographyWithDrift(Sm, paraTwist, [], maxDrift, driftGT,'old',normeps);
 elseif driftType == 2    
     [WRec, S_shiftback, drift, driftAll] = recTompographyWithDrift_rotation(Sm, paraTwist, WSz, driftGT);
 elseif driftType == 3
-    [WRec, SRec, drift, driftAll,info] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT,'new',normeps);
-    [WRec_old, SRec_old, drift_old, driftAll_old,info_old] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT,'old',normeps);
+    [WRecs, SRecs, drift, driftAll,info] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT,'new',normeps);
+    [WRecs_old, SRecs_old, drift_old, driftAll_old,info_old] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT,'old',normeps);
 elseif driftType == 4
     error('not implemented yet!')% loop of type I and type II
 end

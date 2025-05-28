@@ -1,3 +1,5 @@
+%% Parth's dummy changes
+
 %% Chang's documentation for Wendy
 
 % change driftType: line 55
@@ -52,7 +54,7 @@ driftGTAll = {0, []}; % Two Scans: 1st one no drift error.
 
 %% Generate drift error in pixel units for 2nd Scan
 rng('default'); % same random number for repeatable test
-driftType = 1;
+driftType = 2;
 if driftType == 1
     % (1) Type I Drift (systematic beam drift). Assume same drift for all the angles for the same beam. NTau*1 or 1*NTau unknowns
     %TODO: change from NTau*1 to 1*NTau, so that could match Ntheta*NTau dimension in correct order

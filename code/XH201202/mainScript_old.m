@@ -158,7 +158,7 @@ end
 S = SAll(:,:,2);  driftGT = driftGTAll{2}; 
 normeps = norm(LAll{2}*WGT(:)-S(:));
 if driftType == 1
-    [WRec, SRec, L, drift, driftAll] = recTompographyWithDrift(S, paraTwist, [], maxDrift, driftGT);
+    [WRec, SRec, L, drift, driftAll] = recTompographyWithDrift(S, paraTwist, [], maxDrift, driftGT,[],[]);
 elseif driftType == 2    
     [WRec, S_shiftback, drift, driftAll] = recTompographyWithDrift_rotation(S, paraTwist, WSz, driftGT);
 elseif driftType == 3

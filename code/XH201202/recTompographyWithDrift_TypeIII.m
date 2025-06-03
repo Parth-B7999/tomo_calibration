@@ -1,4 +1,4 @@
-function [WRecs, SRecs, drift, driftAll,info] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT, maxIter,lambset,normeps)
+function [WRecs, SRecs, drift, driftAll,info] = recTompographyWithDrift_TypeIII(Sm, paraTwist, WSz, maxDrift, driftGT,lambset,normeps)
 %   Sm: the Sinogram with beamline drifted, NTheta*NTau 2D matrix, normally from measurement
 %% TODO: comments
 % TODO: merge recTompographyWithDrift_rotation() and recTompographyWithDrift()
@@ -68,7 +68,7 @@ for k = 1:maxIter        % When use 10 Iter, wny after 10 iter, may slightly wor
     % This is the key for good reconstruction. 
 
     scaleBegin = 1e2; %1e2; %1e2 in the beginning(k=1), 
-    scaleEnd = 1e1; %1e0~1e1 in the end (k=maxIter),
+    scaleEnd = 1e0; %1e0~1e1 in the end (k=maxIter),
     idx = find(strcmp(paraTwist, 'regWt'))+1; % 6 etc.
 
     if strcmp(lambset,'old')

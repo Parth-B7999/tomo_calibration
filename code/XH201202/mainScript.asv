@@ -29,9 +29,9 @@ if ~exist('batchMode', 'var') || isempty(batchMode); batchMode = false; end
 % WGT:      Sample object ground truth
 
 if ~batchMode
-    sampleName = 'Phantom'; % choose from {'Phantom', 'Brain', ''Golosio', 'circle', 'checkboard', 'fakeRod'}; not case-sensitive
+    sampleName = 'Brain'; % choose from {'Phantom', 'Brain', ''Golosio', 'circle', 'checkboard', 'fakeRod'}; not case-sensitive
 end
-Nx = 256; Ny = Nx; WSz = [Ny, Nx]; %  XH: Ny = 100 -> 10 or 50 for debug.  currently assume object shape is square not general rectangle
+Nx = 50; Ny = Nx; WSz = [Ny, Nx]; %  XH: Ny = 100 -> 10 or 50 for debug.  currently assume object shape is square not general rectangle
 WGT = createObject(sampleName, WSz); WGT = WGT/max(WGT(:)); assert(all(WGT(:)>=0), 'Groundtruth object should be nonnegative');% Object without noise. always assume WGT0 is normailzed with maximum 1.
 
 % (2) Scan Object: Create Forward Model and Sinograms
@@ -42,7 +42,7 @@ WGT = createObject(sampleName, WSz); WGT = WGT/max(WGT(:)); assert(all(WGT(:)>=0
 % SAll:         Sinogram for all scans of NTheta*NTau*NScan, SAll(:,:,n) for the nth scan
 
 if ~batchMode
-    maxDrift=2 ; % maximum drift error; choose from [0.5, 1, 2, 4, 8] or [0.5, 1, 2, 3, 5] etc.
+    maxDrift = 5; % maximum drift error; choose from [0.5, 1, 2, 4, 8] or [0.5, 1, 2, 3, 5] etc.
     maxMaxDriftAll = maxDrift; % in batch mode we consider different maxDrift from maxDriftAll set, where the maximum is maxMaxDriftAll
 end
 NTheta = 90;  % 30/45/60/90 sample angle #. Use odd NOT even, for display purpose of sinagram of Phantom. As even NTheta will include theta of 90 degree where sinagram will be very bright as Phantom sample has verical bright line on left and right boundary.
@@ -52,11 +52,11 @@ driftGTAll = {0, []}; % Two Scans: 1st one no drift error.
 
 %% Generate drift error in pixel units for 2nd Scan
 rng('default'); % same random number for repeatable test
-driftType = 3;
+driftType = 1;
 if driftType == 1
     % (1) Type I Drift (systematic beam drift). Assume same drift for all the angles for the same beam. NTau*1 or 1*NTau unknowns
     %TODO: change from NTau*1 to 1*NTau, so that could match Ntheta*NTau dimension in correct order
-    maxDrift = 5; 
+    maxDrift = 1; 
     driftGT = (2*rand(NTau, 1)- 1) * maxDrift; 
     driftGT(1:ceil(maxMaxDriftAll)) = 0;  driftGT(end-ceil(maxMaxDriftAll)+1:end) = 0; % remember NTau = diagonal + ceil(maxMaxDrift)*2 with zero padding of ceil(maxDrift)
 elseif driftType == 2
@@ -66,7 +66,7 @@ elseif driftType == 2
     driftGT(1:ceil(maxMaxDriftAll)) = 0;  driftGT(end-ceil(maxMaxDriftAll)+1:end) = 0; % remember NTau = diagonal + ceil(maxMaxDrift)*2 with zero padding of ceil(maxDrift)
 elseif driftType == 3
     % (3) Type III Drift (random rotation error + beam drift) Assume drift for each angle and each scan beam position. NTheta*NTau unkowns
-    % maxDrift = 1;
+    maxDrift = 1;
 
     % (3.1) random Gaussian, truncated to [-maxDrift, maxDrift]
     std_ = maxDrift/2; % maxDrift/2 or maxDrift/3 . 95% within 2*std_, so 95% are within [-0.5, 0.5] or [-1, 1] for std_ = 0.25 or 0.5 
@@ -75,7 +75,7 @@ elseif driftType == 3
     
     % (3.2) random Uniform     
     driftGT = (2*rand(NTheta, NTau)- 1) * maxDrift; 
-
+    
     % (3.3) structured, also has L1-sparsity prior, we first try use a real image as drift        
     driftGT = imresize(imread('cameraman512.bmp'), [NTheta, NTau]);  % driftGT = imresize(WGT', [NTheta, NTau]);
     driftGT = (normalize01(driftGT)*2 - 1)*maxDrift; 
@@ -101,7 +101,7 @@ NScan = numel(driftGTAll);
 LAll = cell(2,1); 
 SAll = zeros(NTheta, NTau, NScan);
 if ~batchMode
-    gaussianSTD = 0.01; % 0.01; % [0, 0.01, 0.05]
+    gaussianSTD = 0.02; % 0.01; % [0, 0.01, 0.05]
 end
 for idxScan = 1: NScan
         L = XTM_Tensor_XH(WSz, NTheta, NTau, driftGTAll{idxScan}, WGT);
@@ -156,8 +156,6 @@ if solveNaive4ThreeCases
     for n = 1:numel(cases)    
         %figure(figNo+n); W = WUncalib(:,:,n);  imagesc(W); axis image; title(sprintf('Rec twist %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', cases{n}, difference(W, WGT), regType, regWt, maxIterA));
         figure(figNo+n); W = WUncalib(:,:,n); multAxes(@imagesc, {WGT, W}); multAxes(@title, {'Ground Truth', sprintf('Rec with %s, PSNR=%.2fdB, %s, regWt=%.1e, maxIter=%d', cases{n}, difference(W, WGT), regType, regWt, maxIterA)}); linkAxesXYZLimColorView();
-        PSNR_baseline = psnr(W,WGT);
-        SSIM_baseline = ssim(W,WGT);
     end
     tilefigs;
 end

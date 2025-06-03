@@ -33,7 +33,7 @@ WGT = createObject(sampleName, WSz); WGT = WGT/max(WGT(:)); assert(all(WGT(:)>=0
 % SAll:         Sinogram for all scans of NTheta*NTau*NScan, SAll(:,:,n) for the nth scan
 
 if ~batchMode
-    maxDrift = 10; % maximum drift error; choose from [0.5, 1, 2, 4, 8] or [0.5, 1, 2, 3, 5] etc.
+    maxDrift = 1; % maximum drift error; choose from [0.5, 1, 2, 4, 8] or [0.5, 1, 2, 3, 5] etc.
     maxMaxDriftAll = maxDrift; % in batch mode we consider different maxDrift from maxDriftAll set, where the maximum is maxMaxDriftAll
 end
 NTheta = 45;  % 30/60/45/90 sample angle #. Use odd NOT even, for display purpose of sinagram of Phantom. As even NTheta will include theta of 90 degree where sinagram will be very bright as Phantom sample has verical bright line on left and right boundary.

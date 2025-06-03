@@ -21,6 +21,10 @@
 % (0) in batchmode, such as generate multiple running for different maxDrift, sampleName, and noise for a paper  
 if ~exist('batchMode', 'var') || isempty(batchMode); batchMode = false; end
 
+if exist('maxDrift','var') && ~exist('maxMaxDriftAll','var')
+    maxMaxDriftAll = maxDrift;      % keeps later formulas happy
+end
+
 % various pixel drift, various sample noise (maybe varies angle number)
 % Angle: 20, 40, 90, 180.  
 % (1) Generate Object
@@ -42,7 +46,7 @@ WGT = createObject(sampleName, WSz); WGT = WGT/max(WGT(:)); assert(all(WGT(:)>=0
 % SAll:         Sinogram for all scans of NTheta*NTau*NScan, SAll(:,:,n) for the nth scan
 
 if ~batchMode
-    maxDrift=2 ; % maximum drift error; choose from [0.5, 1, 2, 4, 8] or [0.5, 1, 2, 3, 5] etc.
+    maxDrift = 5; % maximum drift error; choose from [0.5, 1, 2, 4, 8] or [0.5, 1, 2, 3, 5] etc.
     maxMaxDriftAll = maxDrift; % in batch mode we consider different maxDrift from maxDriftAll set, where the maximum is maxMaxDriftAll
 end
 NTheta = 90;  % 30/45/60/90 sample angle #. Use odd NOT even, for display purpose of sinagram of Phantom. As even NTheta will include theta of 90 degree where sinagram will be very bright as Phantom sample has verical bright line on left and right boundary.
@@ -56,7 +60,7 @@ driftType = 3;
 if driftType == 1
     % (1) Type I Drift (systematic beam drift). Assume same drift for all the angles for the same beam. NTau*1 or 1*NTau unknowns
     %TODO: change from NTau*1 to 1*NTau, so that could match Ntheta*NTau dimension in correct order
-    maxDrift = 5; 
+    maxDrift = 3; 
     driftGT = (2*rand(NTau, 1)- 1) * maxDrift; 
     driftGT(1:ceil(maxMaxDriftAll)) = 0;  driftGT(end-ceil(maxMaxDriftAll)+1:end) = 0; % remember NTau = diagonal + ceil(maxMaxDrift)*2 with zero padding of ceil(maxDrift)
 elseif driftType == 2
@@ -66,7 +70,7 @@ elseif driftType == 2
     driftGT(1:ceil(maxMaxDriftAll)) = 0;  driftGT(end-ceil(maxMaxDriftAll)+1:end) = 0; % remember NTau = diagonal + ceil(maxMaxDrift)*2 with zero padding of ceil(maxDrift)
 elseif driftType == 3
     % (3) Type III Drift (random rotation error + beam drift) Assume drift for each angle and each scan beam position. NTheta*NTau unkowns
-    % maxDrift = 1;
+    % maxDrift = 5;
 
     % (3.1) random Gaussian, truncated to [-maxDrift, maxDrift]
     std_ = maxDrift/2; % maxDrift/2 or maxDrift/3 . 95% within 2*std_, so 95% are within [-0.5, 0.5] or [-1, 1] for std_ = 0.25 or 0.5 
@@ -167,7 +171,8 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 Sm = SAll(:,:,2);  driftGT = driftGTAll{2}; 
 normeps = norm(LAll{2}*WGT(:)-Sm(:));
-paraTwist{6} = 1.3e-3; % initial lambda_0
+paraTwist{6} = 1.3e-5; % initial lambda_0
+if exist('lambda0','var');   paraTwist{6} = lambda0;   end
 paraTwist{16} = 1e-4;
 if driftType == 1
     [WRecs, SRecs, L, drift, driftAll, info] = recTompographyWithDrift(Sm, paraTwist, [], maxDrift, driftGT,'new',normeps);

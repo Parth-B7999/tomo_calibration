@@ -1,67 +1,79 @@
-% -------------------------------------------------------------------------
-%  CONFIGURE YOUR MAIN SCRIPT NAME HERE
-% -------------------------------------------------------------------------
-mainScript = 'mainScript1.m';   % <-- change if your file is named differently
-% -------------------------------------------------------------------------
+%% batch_run_tomo.m  –  fire-and-forget batch runner
+% --------------------------------------------------
+%  EDIT THIS LINE if your main file has a different name
+% --------------------------------------------------
+MAIN_FILE = 'mainScript1.m';     % <-- change to your script or function
 
+% -------- parameter grids -----------------------------------------------
 sampleNames   = {'Phantom', 'Brain'};
-gaussianSTDs  = [0.01 0.02];
-maxDrifts     = [1    5];
-lambda0s      = [1.3e-5 1e-8];           % values to drop into paraTwist{6}
+gaussSTDs     = [0.01 0.02];
+maxDrifts     = [1 3 5];
+lambda0s      = [1.3e-5 1e-7];
 
+
+% -------- output folder --------------------------------------------------
+outDir = fullfile(pwd,'results');
+if ~exist(outDir,'dir'); mkdir(outDir); end
+
+% -------- loops ----------------------------------------------------------
 for iS = 1:numel(sampleNames)
-    for iN = 1:numel(gaussianSTDs)
-        for iD = 1:numel(maxDrifts)
-            for iL = 1:numel(lambda0s)
+for iN = 1:numel(gaussSTDs)
+for iD = 1:numel(maxDrifts)
+for iL = 1:numel(lambda0s)
 
-                %----------------------------------------------------------
-                %  House-keeping
-                %----------------------------------------------------------
-                clearvars -except mainScript sampleNames gaussianSTDs ...
-                                   maxDrifts lambda0s iS iN iD iL
-                close all force
+    % House-keeping
+    clearvars -except MAIN_FILE outDir                               ...
+                         sampleNames gaussSTDs maxDrifts lambda0s    ...
+                         iS iN iD iL
+    close all force
 
-                %----------------------------------------------------------
-                %  Variables consumed by the main script
-                %----------------------------------------------------------
-                batchMode   = true;                       
-                sampleName  = sampleNames{iS};              
-                gaussianSTD = gaussianSTDs(iN);           
-                maxDrift    = maxDrifts(iD);               
-                lambda0     = lambda0s(iL);                 
+    % Variables the main script/function will read
+    batchMode   = true;                         
+    sampleName  = sampleNames{iS};             
+    gaussianSTD = gaussSTDs(iN);                
+    maxDrift    = maxDrifts(iD);                
+    lambda0     = lambda0s(iL);                 
 
-                fprintf('\n>>> RUN: %-7s | σ = %.3f | maxDrift = %d | λ₀ = %.1e\n', ...
-                        sampleName, gaussianSTD, maxDrift, lambda0);
+    fprintf('\n>>> %-7s | σ=%.3f | drift=%d | λ₀=%g\n', ...
+            sampleName, gaussianSTD, maxDrift, lambda0);
 
-                %----------------------------------------------------------
-                %  Call the main reconstruction script
-                %----------------------------------------------------------
-                run(mainScript);      
+    % ---------------------------------------------------------------------
+    %  CALL YOUR RECONSTRUCTION CODE
+    % ---------------------------------------------------------------------
+    % A) if MAIN_FILE is a ***script***:
+    run(MAIN_FILE);
 
-                %----------------------------------------------------------
-                %  Optional: save whatever results you need
-                %  Comment out or adapt as desired.
-                %----------------------------------------------------------
-                outFile = sprintf('result_%s_sigma%.3g_drift%d_lambda%.0e.mat', ...
-                  sampleName, gaussianSTD, maxDrift, lambda0);
+    % B) if MAIN_FILE is a ***function***, comment out A) and use:
+    % [WRecs,SRecs,drift,driftAll,info, ...
+    %  WRecs_old,SRecs_old,drift_old,driftAll_old,info_old] = ...
+    %     mainScript1(batchMode,sampleName,gaussianSTD,maxDrift,lambda0);
 
-                % List every variable you might want …
-                varsWanted = { ...
-                    'WRecs','SRecs','drift','driftAll','info', ...            % NEW version
-                    'WRecs_old','SRecs_old','drift_old','driftAll_old','info_old', ... % OLD version
-                    'sampleName','gaussianSTD','maxDrift','lambda0' ...       % bookkeeping
-                };
-                
-                % … keep only those that really exist (some are created only for
-                % Type-I / Type-III runs, so we guard against “variable not found”)
-                vars2save = varsWanted(cellfun(@(v) exist(v,'var')==1, varsWanted));
-                
-                if ~isempty(vars2save)
-                    save(outFile, vars2save{:}, '-v7.3');
-                else
-                    warning('No result variables found to save for %s', outFile);
-                end
-            end
+    % ---------------------------------------------------------------------
+    %  ALWAYS save the exact ten matrices/structs requested
+    % ---------------------------------------------------------------------
+    varsWanted = { ...
+        'WRecs','SRecs','drift','driftAll','info', ...
+        'WRecs_old','SRecs_old','drift_old','driftAll_old','info_old'};
+
+    % Ensure every name exists; create empty placeholder if not
+    for k = 1:numel(varsWanted)
+        if exist(varsWanted{k},'var') ~= 1
+            eval([varsWanted{k} ' = [];']);   
         end
     end
+
+    % File name
+    outFile = fullfile(outDir, ...
+        sprintf('result_%s_sigma%.3g_drift%d_lambda%.0e.mat', ...
+                sampleName, gaussianSTD, maxDrift, lambda0));
+
+    % Save
+    save(outFile, varsWanted{:}, ...
+         'sampleName','gaussianSTD','maxDrift','lambda0','-v7.3');
+
+    fprintf('    saved → %s\n', outFile);
+
+end
+end
+end
 end
